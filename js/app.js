@@ -44,9 +44,10 @@ function makeEventCard(event, { clue = false, preview = false } = {}) {
   const art = card.querySelector(".event-art");
   art.classList.add(artClass(event));
   art.querySelector("span").textContent = event.art || event.artist.slice(0, 1);
-  card.querySelector(".event-kicker").textContent = clue ? event.artist : `${dateLabel(event.date)} · ${event.artist}`;
+  const hideDate = clue || preview;
+  card.querySelector(".event-kicker").textContent = hideDate ? event.artist : `${dateLabel(event.date)} · ${event.artist}`;
   card.querySelector(".event-text").textContent = event.text;
-  if (!clue) card.style.setProperty("--date-label", JSON.stringify(dateLabel(event.date)));
+  if (!hideDate) card.style.setProperty("--date-label", JSON.stringify(dateLabel(event.date)));
   if (preview) card.classList.add("preview-card");
   return card;
 }

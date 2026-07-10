@@ -29,8 +29,11 @@ export function shuffle(items, random = Math.random) {
   return copy;
 }
 
+const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
 export function dateLabel(date) {
-  return date.slice(0, 4);
+  const month = MONTH_LABELS[Number(date.slice(5, 7)) - 1];
+  return `${month} ${date.slice(0, 4)}`;
 }
 
 export function positionForEvent(timeline, event) {
