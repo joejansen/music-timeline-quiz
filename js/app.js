@@ -60,7 +60,7 @@ function updateStats() {
 }
 
 function chooseSlot(slot) {
-  if (state.locked || state.index >= state.clues.length) return;
+  if (state.index >= state.clues.length) return;
   state.pendingSlot = slot;
   render();
   document.querySelector("#place-button")?.focus();
@@ -196,16 +196,10 @@ function showFeedback(correct, event, points) {
   elements.feedback.innerHTML = correct
     ? `<strong>Right on time — +${points} points</strong><span>${dateLabel(event.date)} is exactly where it belongs.</span>`
     : `<strong>Not quite — the timeline fixed it</strong><span>${event.artist}: ${dateLabel(event.date)}. Watch for the mint date badge.</span>`;
-  const next = document.createElement("button");
-  next.type = "button";
-  next.className = "feedback-next";
-  next.textContent = state.index + 1 === state.clues.length ? "See my score" : "Next clue";
-  next.addEventListener("click", nextClue);
-  elements.feedback.append(next);
 }
 
 function placeCurrentClue() {
-  if (state.pendingSlot === null || state.locked) return;
+  if (state.pendingSlot === null) return;
   const event = state.clues[state.index];
   const correctSlot = positionForEvent(state.timeline, event);
   const correct = state.pendingSlot === correctSlot;
@@ -213,21 +207,9 @@ function placeCurrentClue() {
   state.timeline.splice(correctSlot, 0, event);
   state.score += points;
   state.mistakes += correct ? 0 : 1;
-  state.locked = true;
-  state.pendingSlot = null;
-  renderTimeline();
-  renderClue();
-  showFeedback(correct, event, points);
-  updateStats();
-  document.querySelector(".feedback")?.scrollIntoView({ behavior: "smooth", block: "center" });
-}
-
-function nextClue() {
   state.index += 1;
-  state.locked = false;
   state.pendingSlot = null;
-  elements.feedback.className = "feedback";
-  elements.feedback.replaceChildren();
+  showFeedback(correct, event, points);
   render();
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
@@ -240,7 +222,7 @@ function render() {
 
 function startGame(seed) {
   const { anchor, clues } = createGame(allEvents, seed, ROUND_COUNT);
-  state = { seed, timeline: [anchor], clues, index: 0, pendingSlot: null, score: 0, mistakes: 0, locked: false };
+  state = { seed, timeline: [anchor], clues, index: 0, pendingSlot: null, score: 0, mistakes: 0 };
   elements.feedback.className = "feedback";
   elements.feedback.replaceChildren();
   render();
