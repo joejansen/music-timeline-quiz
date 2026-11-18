@@ -3,22 +3,25 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Place music-history moments in chronological order." />
+    <meta name="description" content="Place music-history moments in chronological order. Three misses and the run is over." />
     <meta name="theme-color" content="#fcf8e9" />
     <title>Trackback — A Music History Timeline Game</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%232f345b'/%3E%3Cpath d='M43 15v25.5a9 9 0 1 1-4-7.5V22l-17 4v18.5a9 9 0 1 1-4-7.5V21z' fill='%23ffe07d'/%3E%3C/svg%3E" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:opsz,wght@9..40,500;9..40,600;9..40,700&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&display=swap" />
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
     <main class="app-shell">
-      <header class="game-header" aria-label="Game status">
-        <a class="wordmark" href="./" aria-label="Trackback home">trackback<span>✦</span></a>
-        <div class="game-stats" aria-live="polite">
+      <header class="game-header">
+        <a class="wordmark" href="./" aria-label="Trackback — today’s mix">trackback<span>✦</span></a>
+        <div class="game-stats" aria-label="Game status">
           <span id="round-stat">Loading …</span>
           <span class="stat-divider" aria-hidden="true"></span>
-          <span id="score-stat">0 pts</span>
+          <span id="score-stat">0 correct</span>
           <span class="stat-divider" aria-hidden="true"></span>
-          <span id="mistake-stat">0 missed</span>
+          <span class="lives" id="lives-stat" role="img" aria-label="3 of 3 lives left">♥♥♥</span>
         </div>
         <div class="header-actions">
           <button class="icon-button" id="help-button" type="button" aria-label="How to play">?</button>
@@ -27,16 +30,17 @@
       </header>
 
       <section class="hero" aria-labelledby="game-title">
-        <p class="eyebrow">A music history timeline game</p>
-        <h1 id="game-title">Put the moments<br /><em>in the right order.</em></h1>
-        <p class="subtitle">Drag each clue into the timeline. We’ll reveal the date only after you commit.</p>
+        <p class="eyebrow" id="mix-label">A music history timeline game</p>
+        <h1 id="game-title">Put the moments <em>in the right order.</em></h1>
       </section>
 
-      <div class="feedback" id="feedback" aria-live="polite" aria-atomic="true"></div>
       <section class="game-board" aria-label="Music history game board">
-        <div class="clue-area" id="clue-area"></div>
+        <div class="clue-area" id="clue-area">
+          <p class="status" id="status" aria-live="polite" aria-atomic="true"></p>
+          <div id="clue-content"></div>
+        </div>
         <div class="timeline-wrap">
-          <div class="timeline" id="timeline" aria-label="Timeline. Choose where the current clue belongs."></div>
+          <div class="timeline" id="timeline" aria-label="Timeline, earliest first"></div>
         </div>
       </section>
     </main>
@@ -45,13 +49,13 @@
       <button class="dialog-close" id="close-help" type="button" aria-label="Close instructions">×</button>
       <p class="eyebrow">Welcome to</p>
       <h2 id="how-to-title">Trackback</h2>
-      <p class="intro">Place each music clue into the timeline in chronological order.</p>
+      <p class="intro">Place each music moment on the timeline in the order it happened.</p>
       <ol>
-        <li>Drag the clue to a <strong>before, between, or after</strong> position.</li>
-        <li>Choose <strong>Place on timeline</strong> to lock in your answer.</li>
-        <li>Correct choices earn <strong>2–5 points</strong>. Missed clues snap to their true spot.</li>
+        <li><strong>Drag</strong> the clue to a gap in the timeline, or just <strong>tap the gap</strong>.</li>
+        <li><strong>Lock it in.</strong> The year is revealed and the card settles where it truly belongs.</li>
+        <li>You have <strong>three lives</strong>. The third miss ends the run — your score is how many you got right.</li>
       </ol>
-      <p class="small-print">Each mix is drawn from a large, editable collection of music-history moments. Dates are hidden until you place a clue.</p>
+      <p class="small-print">Moments from the same year count on either side of each other. There’s a new mix every day, and your progress is saved on this device.</p>
       <button class="primary-button" id="start-game" type="button">Let’s play</button>
     </dialog>
 
