@@ -442,11 +442,12 @@ function enableDrag(card) {
       if (dropped) chooseSlot(Number(dropped.dataset.slot));
     }
 
-    cancelDrag = stop;
+    // Capture first: it throws if the pointer is already gone, and then no drag starts.
     card.setPointerCapture(down.pointerId);
     card.addEventListener("pointermove", move);
     card.addEventListener("pointerup", end);
     card.addEventListener("pointercancel", end);
+    cancelDrag = stop;
   });
 }
 
