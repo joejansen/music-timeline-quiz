@@ -475,7 +475,10 @@ function wireControls() {
   ui.dialog.addEventListener("close", () => writeStore(INTRO_KEY, true));
   ui.newGame.addEventListener("click", newMix);
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && !ui.dialog.open) cancelPending();
+    if (event.key !== "Escape" || ui.dialog.open) return;
+    // Escape abandons a drag in progress; otherwise it withdraws the pending pick.
+    if (cancelDrag) cancelDrag();
+    else cancelPending();
   });
 }
 
