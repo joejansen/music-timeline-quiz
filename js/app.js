@@ -6,7 +6,9 @@ import {
   createGame,
   isOver,
   misses,
+  normalizeStats,
   place,
+  plainObject,
   recordResult,
   restore,
   score,
@@ -45,6 +47,8 @@ const scrollBehavior = () => (reducedMotion.matches ? "auto" : "smooth");
 let events = [];
 // { seed, mode: "daily" | "practice", game, state, pendingSlot, recorded, lastId }
 let session = null;
+// Cleanup for the drag in progress, if any. A re-render replaces the card being dragged.
+let cancelDrag = null;
 
 /* ---------- Small helpers ---------- */
 
@@ -102,7 +106,7 @@ function setStatus(text, tone = "") {
 function startSession(seed, { fresh = false } = {}) {
   const mode = seed === todayDate() ? "daily" : "practice";
   const game = createGame(events, seed, ROUND_COUNT);
-  const saved = readStore(SAVE_KEY, {})[mode];
+  const saved = plainObject(readStore(SAVE_KEY, {}))[mode];
   const restored = !fresh && saved?.seed === seed ? restore(game, saved) : null;
   session = {
     seed,
@@ -122,7 +126,7 @@ function startSession(seed, { fresh = false } = {}) {
 }
 
 function save() {
-  const saves = readStore(SAVE_KEY, {});
+  const saves = plainObject(readStore(SAVE_KEY, {}));
   saves[session.mode] = { ...serialize(session.seed, session.state), recorded: session.recorded };
   writeStore(SAVE_KEY, saves);
 }
@@ -130,7 +134,7 @@ function save() {
 function recordFinish() {
   if (session.recorded) return;
   const dailyDate = session.mode === "daily" ? session.seed : null;
-  writeStore(STATS_KEY, recordResult(readStore(STATS_KEY, EMPTY_STATS), { score: score(session.state), dailyDate }));
+  writeStore(STATS_KEY, recordResult(readStore(STATS_KEY, null), { score: score(session.state), dailyDate }));
   session.recorded = true;
 }
 
@@ -234,13 +238,17 @@ function completeCard() {
   const points = score(state);
   const flawless = points === total;
   const knockedOut = misses(state) >= MAX_MISSES;
-  const stats = { ...EMPTY_STATS, ...readStore(STATS_KEY, EMPTY_STATS) };
+  const stats = normalizeStats(readStore(STATS_KEY, EMPTY_STATS));
 
+  const unplayed = total - state.results.length;
+  const spare = MAX_MISSES - misses(state);
   const summary = flawless
     ? "Every clue, first time. That’s headliner behavior."
-    : knockedOut
-      ? `Third miss — the run ends with ${total - state.results.length} clues unplayed.`
-      : `You reached the end of the mix with ${MAX_MISSES - misses(state)} ${MAX_MISSES - misses(state) === 1 ? "life" : "lives"} to spare.`;
+    : !knockedOut
+      ? `You reached the end of the mix with ${spare} ${spare === 1 ? "life" : "lives"} to spare.`
+      : unplayed === 0
+        ? "Third miss, on the very last clue."
+        : `Third miss — the run ends with ${unplayed} ${unplayed === 1 ? "clue" : "clues"} unplayed.`;
 
   const dots = el("div", { class: "result-dots", role: "img", "aria-label": `${points} right, ${misses(state)} missed` });
   for (let index = 0; index < total; index += 1) {
@@ -374,7 +382,7 @@ function zoneAt(x, y) {
 
 function enableDrag(card) {
   card.addEventListener("pointerdown", (down) => {
-    if (down.button !== 0) return;
+    if (down.button !== 0 || cancelDrag) return;
     let ghost = null;
     let target = null;
     let frame = 0;
@@ -398,11 +406,13 @@ function enableDrag(card) {
     };
 
     const move = (event) => {
+      if (event.pointerId !== down.pointerId) return;
       pointer = { x: event.clientX, y: event.clientY };
       if (!ghost) {
         if (Math.hypot(pointer.x - down.clientX, pointer.y - down.clientY) < 8) return;
         ghost = card.cloneNode(true);
         ghost.classList.add("drag-ghost");
+        ghost.classList.remove("is-pending");
         ghost.removeAttribute("aria-label");
         ghost.style.width = `${card.offsetWidth}px`;
         document.body.append(ghost);
@@ -413,19 +423,26 @@ function enableDrag(card) {
       ghost.style.transform = `translate(${pointer.x - ghost.offsetWidth / 2}px, ${pointer.y - 34}px) rotate(-1.5deg)`;
     };
 
-    const end = (event) => {
+    const stop = () => {
       card.removeEventListener("pointermove", move);
       card.removeEventListener("pointerup", end);
       card.removeEventListener("pointercancel", end);
       cancelAnimationFrame(frame);
-      if (!ghost) return;
-      ghost.remove();
+      ghost?.remove();
       document.body.classList.remove("is-dragging");
       card.classList.remove("is-dragging");
       target?.classList.remove("drag-over");
-      if (event.type === "pointerup" && target) chooseSlot(Number(target.dataset.slot));
+      cancelDrag = null;
     };
 
+    function end(event) {
+      if (event.pointerId !== down.pointerId) return;
+      const dropped = ghost && event.type === "pointerup" ? target : null;
+      stop();
+      if (dropped) chooseSlot(Number(dropped.dataset.slot));
+    }
+
+    cancelDrag = stop;
     card.setPointerCapture(down.pointerId);
     card.addEventListener("pointermove", move);
     card.addEventListener("pointerup", end);
@@ -436,6 +453,7 @@ function enableDrag(card) {
 /* ---------- Render ---------- */
 
 function render() {
+  cancelDrag?.();
   const { game, state, mode, seed } = session;
   const over = isOver(game, state);
   const left = MAX_MISSES - misses(state);

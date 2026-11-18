@@ -245,7 +245,10 @@ h1 em { color: var(--blue); font-style: normal; }
   transition: transform .18s ease, box-shadow .18s ease, opacity .18s ease;
 }
 
-.clue-card:hover { transform: translateY(-2px) rotate(-.3deg); box-shadow: 0 9px 0 var(--card-shadow); }
+@media (hover: hover) {
+  .clue-card:hover { transform: translateY(-2px) rotate(-.3deg); box-shadow: 0 9px 0 var(--card-shadow); }
+}
+
 .clue-card:focus { outline: 0; }
 .clue-card.is-pending { opacity: .55; }
 .clue-card.is-dragging { opacity: .3; transform: none; }

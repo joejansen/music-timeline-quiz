@@ -8,7 +8,9 @@ import {
   createGame,
   isOver,
   misses,
+  normalizeStats,
   place,
+  plainObject,
   previousDay,
   recordResult,
   resolvePlacement,
@@ -128,6 +130,27 @@ test("restore rejects saves that do not fit the game", () => {
   assert.equal(restore(game, { ...saved, timeline: [saved.timeline[0], "gone"] }), null);
   assert.equal(restore(game, { ...saved, timeline: [...saved.timeline].reverse() }), null);
   assert.equal(restore(game, { ...saved, results: [true, true] }), null);
+  for (const junk of ["abc", 5, true, [], { timeline: "x", results: [] }]) assert.equal(restore(game, junk), null);
+});
+
+test("restore accepts a finished run but nothing played past the third miss", () => {
+  const game = createGame(fakeEvents, "ended", 25);
+  let state = startState(game);
+  for (let miss = 0; miss < MAX_MISSES; miss += 1) state = play(game, state, false).state;
+  assert.deepEqual(restore(game, serialize("ended", state)), state);
+  const beyond = play(game, state, true).state;
+  assert.equal(restore(game, serialize("ended", beyond)), null);
+});
+
+test("corrupt stored values are treated as empty", () => {
+  for (const junk of [null, undefined, "abc", 5, true, [1]]) assert.deepEqual(plainObject(junk), {});
+  const slots = { daily: { seed: "x" } };
+  assert.equal(plainObject(slots), slots);
+  assert.deepEqual(normalizeStats("abc"), { played: 0, best: 0, streak: 0, maxStreak: 0, lastDaily: null });
+  assert.deepEqual(normalizeStats({ played: "x", best: 7, streak: -1, lastDaily: 4 }), {
+    played: 0, best: 7, streak: 0, maxStreak: 0, lastDaily: null,
+  });
+  assert.equal(recordResult({ played: "x" }, { score: 3 }).played, 1);
 });
 
 test("daily streaks grow on consecutive days and reset after a gap", () => {
@@ -136,6 +159,8 @@ test("daily streaks grow on consecutive days and reset after a gap", () => {
   assert.equal(stats.streak, 1);
   stats = recordResult(stats, { score: 14, dailyDate: "2026-11-18" });
   assert.deepEqual(stats, { played: 2, best: 14, streak: 2, maxStreak: 2, lastDaily: "2026-11-18" });
+  stats = recordResult(stats, { score: 9, dailyDate: "2026-11-18" });
+  assert.equal(stats.streak, 2, "finishing the same daily twice does not extend the streak");
   stats = recordResult(stats, { score: 20 });
   assert.equal(stats.streak, 2, "a non-daily mix leaves the streak alone");
   assert.equal(stats.best, 20);
@@ -157,5 +182,6 @@ test("event data is well formed", () => {
   for (const event of realEvents) {
     assert.ok(Number.isInteger(event.year) && event.year > 1800 && event.year < 2100, event.id);
     assert.ok(event.artist && event.text, event.id);
+    assert.equal("date" in event, false, event.id);
   }
 });

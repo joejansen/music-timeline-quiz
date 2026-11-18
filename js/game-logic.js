@@ -103,6 +103,11 @@ export function place(game, state, slot) {
 
 /* ---------- Save / restore ---------- */
 
+// Anything read back from storage may be corrupt; treat non-objects as empty.
+export function plainObject(value) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+}
+
 export function serialize(seed, state) {
   return { seed, timeline: state.timeline.map((event) => event.id), results: [...state.results] };
 }
@@ -111,6 +116,8 @@ export function serialize(seed, state) {
 export function restore(game, saved) {
   if (!saved || !Array.isArray(saved.timeline) || !Array.isArray(saved.results)) return null;
   if (saved.results.length > game.clues.length) return null;
+  // A run stops at the third miss, so nothing can follow it.
+  if (saved.results.slice(0, -1).filter((correct) => !correct).length >= MAX_MISSES) return null;
   const played = [game.anchor, ...game.clues.slice(0, saved.results.length)];
   const byId = new Map(played.map((event) => [event.id, event]));
   const ids = new Set(saved.timeline);
@@ -125,6 +132,16 @@ export function restore(game, saved) {
 
 export const EMPTY_STATS = { played: 0, best: 0, streak: 0, maxStreak: 0, lastDaily: null };
 
+export function normalizeStats(raw) {
+  const source = plainObject(raw);
+  const stats = { ...EMPTY_STATS };
+  for (const key of ["played", "best", "streak", "maxStreak"]) {
+    if (Number.isInteger(source[key]) && source[key] >= 0) stats[key] = source[key];
+  }
+  if (typeof source.lastDaily === "string") stats.lastDaily = source.lastDaily;
+  return stats;
+}
+
 export function previousDay(date) {
   const day = new Date(`${date}T00:00:00Z`);
   day.setUTCDate(day.getUTCDate() - 1);
@@ -133,7 +150,7 @@ export function previousDay(date) {
 
 // `dailyDate` is the YYYY-MM-DD of a finished daily mix, or null for any other mix.
 export function recordResult(stats, { score: points, dailyDate = null }) {
-  const next = { ...EMPTY_STATS, ...stats };
+  const next = normalizeStats(stats);
   next.played += 1;
   next.best = Math.max(next.best, points);
   if (dailyDate && next.lastDaily !== dailyDate) {
