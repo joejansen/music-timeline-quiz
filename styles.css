@@ -154,6 +154,15 @@ h1 em { color: var(--blue); font-style: normal; }
   text-align: center;
 }
 
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 .status.is-correct { color: var(--mint-deep); }
 .status.is-missed { color: var(--coral-deep); }
 

@@ -131,6 +131,7 @@ test("restore rejects saves that do not fit the game", () => {
   assert.equal(restore(game, { ...saved, timeline: [...saved.timeline].reverse() }), null);
   assert.equal(restore(game, { ...saved, results: [true, true] }), null);
   for (const junk of ["abc", 5, true, [], { timeline: "x", results: [] }]) assert.equal(restore(game, junk), null);
+  for (const result of ["false", 1, null]) assert.equal(restore(game, { ...saved, results: [result] }), null);
 });
 
 test("restore accepts a finished run but nothing played past the third miss", () => {

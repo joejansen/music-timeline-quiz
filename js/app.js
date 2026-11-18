@@ -96,8 +96,10 @@ function pageTop(node) {
   return node.getBoundingClientRect().top + window.scrollY;
 }
 
-function setStatus(text, tone = "") {
-  ui.status.textContent = text;
+// `spoken` is extra detail for screen readers only: the header stats change silently.
+function setStatus(text, tone = "", spoken = "") {
+  ui.status.replaceChildren(text);
+  if (spoken) ui.status.append(el("span", { class: "visually-hidden", text: ` ${spoken}` }));
   ui.status.className = `status ${tone}`.trim();
 }
 
@@ -329,9 +331,14 @@ function confirmPlacement() {
   save();
 
   const left = MAX_MISSES - misses(session.state);
-  if (result.correct) setStatus(`✓ ${result.event.year} — right where it belongs.`, "is-correct");
-  else if (left === 0) setStatus(`✗ It was ${result.event.year}. That was your last life.`, "is-missed");
-  else setStatus(`✗ It was ${result.event.year} — moved to its true spot. ${left} ${left === 1 ? "life" : "lives"} left.`, "is-missed");
+  const total = session.game.clues.length;
+  const points = score(session.state);
+  const spoken = over
+    ? `Run over. ${points} of ${total} correct.`
+    : `${points} correct. Clue ${session.state.results.length + 1} of ${total}.`;
+  if (result.correct) setStatus(`✓ ${result.event.year} — right where it belongs.`, "is-correct", spoken);
+  else if (left === 0) setStatus(`✗ It was ${result.event.year}. That was your last life.`, "is-missed", spoken);
+  else setStatus(`✗ It was ${result.event.year} — moved to its true spot. ${left} ${left === 1 ? "life" : "lives"} left.`, "is-missed", spoken);
 
   render();
   const item = ui.timeline.querySelector(`[data-id="${CSS.escape(result.event.id)}"]`);

@@ -116,6 +116,7 @@ export function serialize(seed, state) {
 export function restore(game, saved) {
   if (!saved || !Array.isArray(saved.timeline) || !Array.isArray(saved.results)) return null;
   if (saved.results.length > game.clues.length) return null;
+  if (!saved.results.every((result) => typeof result === "boolean")) return null;
   // A run stops at the third miss, so nothing can follow it.
   if (saved.results.slice(0, -1).filter((correct) => !correct).length >= MAX_MISSES) return null;
   const played = [game.anchor, ...game.clues.slice(0, saved.results.length)];
@@ -125,7 +126,7 @@ export function restore(game, saved) {
   if (!saved.timeline.every((id) => byId.has(id))) return null;
   const timeline = saved.timeline.map((id) => byId.get(id));
   if (timeline.some((event, index) => index > 0 && timeline[index - 1].year > event.year)) return null;
-  return { timeline, results: saved.results.map(Boolean) };
+  return { timeline, results: [...saved.results] };
 }
 
 /* ---------- Stats ---------- */
