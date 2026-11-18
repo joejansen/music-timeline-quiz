@@ -1,4 +1,5 @@
 export const ROUND_COUNT = 25;
+export const MAX_MISSES = 3;
 
 export function hashSeed(seed) {
   let hash = 2166136261;
@@ -29,60 +30,128 @@ export function shuffle(items, random = Math.random) {
   return copy;
 }
 
-const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+/* ---------- Placement ---------- */
 
-export function dateLabel(date) {
-  const month = MONTH_LABELS[Number(date.slice(5, 7)) - 1];
-  return `${month} ${date.slice(0, 4)}`;
-}
-
-export function positionForEvent(timeline, event) {
-  return timeline.findIndex((item) => item.date > event.date) === -1
-    ? timeline.length
-    : timeline.findIndex((item) => item.date > event.date);
-}
-
-export function pointsForRound(round) {
-  if (round <= 5) return 5;
-  if (round <= 12) return 4;
-  if (round <= 20) return 3;
-  return 2;
-}
-
-function weightedPick(events, selected, usedDates, random) {
-  const options = events.filter((event) => !selected.has(event.id) && !usedDates.has(event.date));
-  const totalWeight = options.reduce((total, event) => total + (event.featured ? 2 : 1), 0);
-  let cursor = random() * totalWeight;
-  for (const event of options) {
-    cursor -= event.featured ? 2 : 1;
-    if (cursor <= 0) return event;
+// Events only carry a year, so an event may sit on either side of others from
+// the same year. Every slot from `min` to `max` (inclusive) is a right answer.
+export function validSlots(timeline, event) {
+  let min = 0;
+  let max = 0;
+  for (const item of timeline) {
+    if (item.year < event.year) min += 1;
+    if (item.year <= event.year) max += 1;
   }
-  return options.at(-1);
+  return { min, max };
 }
+
+// A wrong pick is moved to the valid slot nearest to where the player put it.
+export function resolvePlacement(timeline, event, slot) {
+  const { min, max } = validSlots(timeline, event);
+  const correct = slot >= min && slot <= max;
+  return { correct, slot: correct ? slot : Math.min(Math.max(slot, min), max) };
+}
+
+/* ---------- Building a mix ---------- */
+
+const weight = (event) => (event.featured ? 2 : 1);
 
 export function createGame(events, seed, roundCount = ROUND_COUNT) {
   const random = seededRandom(seed);
-  const selected = new Set();
-  const usedDates = new Set();
+  const pool = [...events];
   const picks = [];
-  const uniqueCount = Math.min(roundCount + 1, events.length);
+  const count = Math.min(roundCount + 1, pool.length);
 
-  while (picks.length < uniqueCount) {
-    const event = weightedPick(events, selected, usedDates, random);
-    if (!event) break;
-    selected.add(event.id);
-    if (!usedDates.has(event.date)) {
-      picks.push(event);
-      usedDates.add(event.date);
-    }
+  while (picks.length < count) {
+    const total = pool.reduce((sum, event) => sum + weight(event), 0);
+    let cursor = random() * total;
+    let index = pool.findIndex((event) => (cursor -= weight(event)) < 0);
+    if (index === -1) index = pool.length - 1;
+    picks.push(...pool.splice(index, 1));
   }
 
-  const sorted = [...picks].sort((a, b) => a.date.localeCompare(b.date));
+  const sorted = [...picks].sort((a, b) => a.year - b.year);
   const anchorMin = Math.max(1, Math.floor(sorted.length * 0.32));
   const anchorMax = Math.max(anchorMin + 1, Math.floor(sorted.length * 0.68));
-  const anchorIndex = anchorMin + Math.floor(random() * (anchorMax - anchorMin));
-  const anchor = sorted[anchorIndex];
+  const anchor = sorted[Math.min(sorted.length - 1, anchorMin + Math.floor(random() * (anchorMax - anchorMin)))];
   const clues = shuffle(sorted.filter((event) => event.id !== anchor.id), random);
 
   return { anchor, clues };
+}
+
+/* ---------- Game state ---------- */
+
+// state = { timeline: Event[] in year order, results: boolean[] one per clue played }
+
+export function startState(game) {
+  return { timeline: [game.anchor], results: [] };
+}
+
+export const score = (state) => state.results.filter(Boolean).length;
+export const misses = (state) => state.results.length - score(state);
+
+export function isOver(game, state) {
+  return misses(state) >= MAX_MISSES || state.results.length >= game.clues.length;
+}
+
+export function place(game, state, slot) {
+  const event = game.clues[state.results.length];
+  const outcome = resolvePlacement(state.timeline, event, slot);
+  const timeline = [...state.timeline];
+  timeline.splice(outcome.slot, 0, event);
+  return { ...outcome, event, state: { timeline, results: [...state.results, outcome.correct] } };
+}
+
+/* ---------- Save / restore ---------- */
+
+export function serialize(seed, state) {
+  return { seed, timeline: state.timeline.map((event) => event.id), results: [...state.results] };
+}
+
+// Returns null when the save does not fit this game (edited data, corrupt storage).
+export function restore(game, saved) {
+  if (!saved || !Array.isArray(saved.timeline) || !Array.isArray(saved.results)) return null;
+  if (saved.results.length > game.clues.length) return null;
+  const played = [game.anchor, ...game.clues.slice(0, saved.results.length)];
+  const byId = new Map(played.map((event) => [event.id, event]));
+  const ids = new Set(saved.timeline);
+  if (ids.size !== played.length || saved.timeline.length !== played.length) return null;
+  if (!saved.timeline.every((id) => byId.has(id))) return null;
+  const timeline = saved.timeline.map((id) => byId.get(id));
+  if (timeline.some((event, index) => index > 0 && timeline[index - 1].year > event.year)) return null;
+  return { timeline, results: saved.results.map(Boolean) };
+}
+
+/* ---------- Stats ---------- */
+
+export const EMPTY_STATS = { played: 0, best: 0, streak: 0, maxStreak: 0, lastDaily: null };
+
+export function previousDay(date) {
+  const day = new Date(`${date}T00:00:00Z`);
+  day.setUTCDate(day.getUTCDate() - 1);
+  return day.toISOString().slice(0, 10);
+}
+
+// `dailyDate` is the YYYY-MM-DD of a finished daily mix, or null for any other mix.
+export function recordResult(stats, { score: points, dailyDate = null }) {
+  const next = { ...EMPTY_STATS, ...stats };
+  next.played += 1;
+  next.best = Math.max(next.best, points);
+  if (dailyDate && next.lastDaily !== dailyDate) {
+    next.streak = next.lastDaily === previousDay(dailyDate) ? next.streak + 1 : 1;
+    next.maxStreak = Math.max(next.maxStreak, next.streak);
+    next.lastDaily = dailyDate;
+  }
+  return next;
+}
+
+// A streak is still alive if the last daily was finished today or yesterday.
+export function activeStreak(stats, today) {
+  return stats.lastDaily === today || stats.lastDaily === previousDay(today) ? stats.streak : 0;
+}
+
+export function shareText({ label, results, total, url }) {
+  const marks = results.map((correct) => (correct ? "🟩" : "🟥"));
+  const rows = [];
+  for (let i = 0; i < marks.length; i += 10) rows.push(marks.slice(i, i + 10).join(""));
+  return [`Trackback ${label} — ${results.filter(Boolean).length}/${total}`, ...rows, url].join("\n");
 }

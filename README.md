@@ -23,7 +23,7 @@ All clues live in [`data/events.json`](./data/events.json). Each record has:
 ```json
 {
   "id": "unique-slug",
-  "date": "1997-05-21",
+  "year": 1997,
   "artist": "Artist or scene",
   "text": "The clue shown before a player places it.",
   "featured": true,
@@ -31,12 +31,26 @@ All clues live in [`data/events.json`](./data/events.json). Each record has:
 }
 ```
 
-`date` controls order. `featured: true` gives an event twice the draw weight, which intentionally puts the requested artists and Britpop into more games while keeping every mix broad. The date stays hidden from the player until after placement.
+`year` controls order and is the only date the game knows: events from the same year are accepted on either side of each other. `featured: true` gives an event twice the draw weight. The year stays hidden until the clue is placed.
 
-The daily game is deterministic from the New York date. Add `?seed=anything-you-like` to share a specific mix, or choose **New mix** for a fresh one.
+The daily mix is deterministic from the New York date. **New mix** starts a random one and puts its seed in the URL (`?seed=…`), so the link replays the same mix.
 
 ## Game rules
 
-- A mix begins with one known timeline event and 25 hidden-date clues.
-- Drag a clue to a labeled drop point (or click a drop point for keyboard/touch use), then confirm it.
-- A correct first placement earns 5, 4, 3, or 2 points as the mix progresses. A missed clue earns no points and moves to the correct location.
+- A mix begins with one known event and up to 25 hidden-year clues.
+- Drag a clue to a gap in the timeline (mouse or touch), or tap/click the gap, then **Lock it in**.
+- A right placement scores a point. A wrong one costs a life and the card moves to its true position.
+- The third miss ends the run. The score is the number of clues placed correctly.
+
+## Saved on the device
+
+Progress and stats live in `localStorage`; there is no server.
+
+- `trackback-save-v2` — the in-progress or finished daily mix and the latest other mix, so a reload resumes.
+- `trackback-stats-v1` — runs played, best score, and the daily streak (consecutive New York days with a finished daily mix).
+
+## Tests
+
+```bash
+npm test
+```
